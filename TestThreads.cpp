@@ -1,16 +1,16 @@
 // TestThreads.cpp: определяет точку входа для консольного приложения.
 //
 
-#include "stdafx.h"
 #include <iostream>
 #include <thread>
-#include <string>
 #include <queue>
 #include <mutex>
+#include "employeethreads.h"
 
 using namespace std;
 
 mutex queueSafer;
+queue<string> enteredAccounts;
 
 // Печать очереди
 void printQueue(queue<string> input)
@@ -27,14 +27,45 @@ void printQueue(queue<string> input)
 
 }
 
-// Первый поток
-void createTree(queue<string> employees)
+Employeer parceAccount(string workerData)
 {
-	cout << "Create employees tree" << endl; 
-	lock_guard<mutex> firstGuard(queueSafer); // Умное блокирование очереди
-	//queueSafer.lock();
-	printQueue(employees);  // Использование общих данных
-	//queueSafer.unlock();
+    size_t commaPosition;
+    commaPosition = workerData.find(",");
+    string fio = workerData.substr(0, commaPosition);
+    ++commaPosition;                                                            // Для сдвига
+    workerData = workerData.substr(commaPosition, workerData.length() - 1);     // Сдвиг строки
+    cout << "FIO is " << fio << endl;
+
+    commaPosition = workerData.find(",");
+    string rank = workerData.substr(0, commaPosition);
+    cout << "Rank is " << rank << endl;
+
+    commaPosition++;
+    string dateBirth = workerData.substr(commaPosition, workerData.length() - 1);     // Сдвиг строки
+    cout << "Date of Birth is " << dateBirth << endl;
+
+    Employeer workerNode;
+    return workerNode;
+}
+
+// Первый поток
+void createTree()
+{
+    if(!enteredAccounts.empty())
+    {
+    lock_guard<mutex> firstGuard(queueSafer); // Умное блокирование очереди
+    //queueSafer.lock();
+
+    if(enteredAccounts.front() == "stop")
+    {
+        return;
+    }
+    printQueue(enteredAccounts);  // Использование общих данных
+    Employeer currentEmployee = parceAccount(enteredAccounts.front());
+    enteredAccounts.pop();
+    //queueSafer.unlock();
+    cout << "hmmm" << endl;
+    }
 }
 
 //Второй поток
@@ -46,25 +77,25 @@ void printTree()
 int main()
 {
 	string buff = "";
-	queue<string> enteredAccounts;
-	while (true)
+    //queue<string> enteredAccounts;
+    while (true)
 	{
 		getline(cin, buff);
 		queueSafer.lock(); // Блокирование мьютекса для защиты очереди
 		enteredAccounts.push(buff);
 		queueSafer.unlock();
 
-		thread th1(createTree, enteredAccounts);
-		th1.join();
+        thread th1(createTree);
+        th1.join();
 
 		// Условие завершения
-		if (buff == "stop")
+        if (buff == "stop")
 		{
 			break;
 		}
 	}
 
-	cout << enteredAccounts.size() << endl;
+    cout << "Size of queue is " << enteredAccounts.size() << endl;
 
 	/*
 	thread th1(createTree);

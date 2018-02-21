@@ -23,5 +23,6 @@ struct Employee
 /*************************Переменные**********************/
 size_t treeSize;
 
-
+// Корень дерева работников
+Employee *employeeTree;
 #endif // EMPLOYEETHREADS_H

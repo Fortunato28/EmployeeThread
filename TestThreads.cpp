@@ -27,6 +27,7 @@ void printQueue(queue<string> input)
 
 }
 
+// Парсим строку
 Employeer parceAccount(string workerData)
 {
     size_t commaPosition;
@@ -54,17 +55,15 @@ void createTree()
     if(!enteredAccounts.empty())
     {
     lock_guard<mutex> firstGuard(queueSafer); // Умное блокирование очереди
-    //queueSafer.lock();
 
     if(enteredAccounts.front() == "stop")
     {
+        // TODO: написать включение последнего элемента "stop"
         return;
     }
     printQueue(enteredAccounts);  // Использование общих данных
     Employeer currentEmployee = parceAccount(enteredAccounts.front());
     enteredAccounts.pop();
-    //queueSafer.unlock();
-    cout << "hmmm" << endl;
     }
 }
 

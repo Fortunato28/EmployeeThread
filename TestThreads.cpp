@@ -1,4 +1,4 @@
-// TestThreads.cpp: определяет точку входа для консольного приложения.
+п»ї// TestThreads.cpp: РѕРїСЂРµРґРµР»СЏРµС‚ С‚РѕС‡РєСѓ РІС…РѕРґР° РґР»СЏ РєРѕРЅСЃРѕР»СЊРЅРѕРіРѕ РїСЂРёР»РѕР¶РµРЅРёСЏ.
 //
 
 #include <iostream>
@@ -12,7 +12,7 @@ using namespace std;
 mutex queueSafer;
 queue<string> enteredAccounts;
 
-// Печать очереди
+// РџРµС‡Р°С‚СЊ РѕС‡РµСЂРµРґРё
 void printQueue(queue<string> input)
 {
 	queue<string> buff = input;
@@ -27,47 +27,90 @@ void printQueue(queue<string> input)
 
 }
 
-// Парсим строку
-Employeer parceAccount(string workerData)
+// Р”РѕР±Р°РІР»РµРЅРёРµ СѓР·Р»Р°
+Employee* addNode(Employee *employeeNode, string fio, string rank, string birthDate)
+{
+	if (!treeSize && (rank != "director"))               // РЎРЅР°С‡Р°Р»Р° РЅСѓР¶РЅРѕ Р·Р°РґР°С‚СЊ РґРёСЂРµРєС‚РѕСЂР° РїСЂРµРґРїСЂРёСЏС‚РёСЏ
+	{
+		cout << "Please, enter director firstly." << endl;
+		return NULL;
+	}
+	if ((treeSize == 1) && (rank != "manager"))			// Рђ РїРѕСЃР»Рµ РґРёСЂРµРєС‚РѕСЂР° С…РѕС‚СЏ Р±С‹ РѕРґРЅРѕРіРѕ РјРµРЅРµРґР¶РµСЂР°
+	{
+		cout << "Please, enter manager." << endl;
+		return NULL;
+	}
+	if ((treeSize > 1) && (rank == "director"))			// Р”РёСЂРµРєС‚РѕСЂ РјРѕР¶РµС‚ Р±С‹С‚СЊ С‚РѕР»СЊРєРѕ РѕРґРёРЅ
+	{
+		cout << "Company can have only one director." << endl;
+		return NULL;
+	}
+	if ((treeSize > 1) && ((rank != "manager") || (rank != "worker")))
+	{
+
+		cout << treeSize <<"Please, enter correct rank: manager or worker" << endl;
+		return NULL;
+	}
+	if (!employeeNode)				// Р•СЃР»Рё СѓР·РµР» РїСѓСЃС‚
+	{
+		employeeNode = new Employee;
+		employeeNode->fio = fio;
+		employeeNode->rank = rank;
+		employeeNode->birthDate = birthDate;
+		employeeNode->subordinate.push_back(NULL);
+	}
+	
+	++treeSize;											// Р’ РґРµСЂРµРІРµ СЃС‚Р°Р»Рѕ Р±РѕР»СЊС€Рµ РЅР° РѕРґРёРЅ СѓР·РµР»
+	return employeeNode;
+}
+
+// РџР°СЂСЃРёРј СЃС‚СЂРѕРєСѓ
+Employee * parceAccount(string workerData)
 {
     size_t commaPosition;
     commaPosition = workerData.find(",");
     string fio = workerData.substr(0, commaPosition);
-    ++commaPosition;                                                            // Для сдвига
-    workerData = workerData.substr(commaPosition, workerData.length() - 1);     // Сдвиг строки
-    cout << "FIO is " << fio << endl;
+    ++commaPosition;                                                            // Р”Р»СЏ СЃРґРІРёРіР°
+    workerData = workerData.substr(commaPosition, workerData.length() - 1);     // РЎРґРІРёРі СЃС‚СЂРѕРєРё
+    //cout << "FIO is " << fio << endl;
 
     commaPosition = workerData.find(",");
     string rank = workerData.substr(0, commaPosition);
-    cout << "Rank is " << rank << endl;
+    //cout << "Rank is " << rank << endl;
 
     commaPosition++;
-    string dateBirth = workerData.substr(commaPosition, workerData.length() - 1);     // Сдвиг строки
-    cout << "Date of Birth is " << dateBirth << endl;
+    string birthDate = workerData.substr(commaPosition, workerData.length() - 1);     // РЎРґРІРёРі СЃС‚СЂРѕРєРё
+    //cout << "Date of Birth is " << birthDate << endl; 
 
-    Employeer workerNode;
-    return workerNode;
+    Employee *employeeNode = NULL;
+
+	employeeNode = addNode(employeeNode, fio, rank, birthDate);
+
+    return employeeNode;
 }
 
-// Первый поток
+// РџРµСЂРІС‹Р№ РїРѕС‚РѕРє
 void createTree()
 {
-    if(!enteredAccounts.empty())
-    {
-    lock_guard<mutex> firstGuard(queueSafer); // Умное блокирование очереди
+	while (true)
+	{
+		if (!enteredAccounts.empty())
+		{
+			lock_guard<mutex> firstGuard(queueSafer); // РЈРјРЅРѕРµ Р±Р»РѕРєРёСЂРѕРІР°РЅРёРµ РѕС‡РµСЂРµРґРё
 
-    if(enteredAccounts.front() == "stop")
-    {
-        // TODO: написать включение последнего элемента "stop"
-        return;
-    }
-    printQueue(enteredAccounts);  // Использование общих данных
-    Employeer currentEmployee = parceAccount(enteredAccounts.front());
-    enteredAccounts.pop();
-    }
+			if (enteredAccounts.front() == "stop")
+			{
+				// TODO: РЅР°РїРёСЃР°С‚СЊ РІРєР»СЋС‡РµРЅРёРµ РїРѕСЃР»РµРґРЅРµРіРѕ СЌР»РµРјРµРЅС‚Р° "stop"
+				return;
+			}
+			//printQueue(enteredAccounts);  // РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РѕР±С‰РёС… РґР°РЅРЅС‹С…
+			Employee *currentEmployee = parceAccount(enteredAccounts.front());
+			enteredAccounts.pop();
+		}
+	}
 }
 
-//Второй поток
+//Р’С‚РѕСЂРѕР№ РїРѕС‚РѕРє
 void printTree()
 {
 	cout << "Print employees tree" << endl;
@@ -76,34 +119,29 @@ void printTree()
 int main()
 {
 	string buff = "";
-    //queue<string> enteredAccounts;
+	treeSize = 0;
+
+	thread th1(createTree);
+
     while (true)
 	{
 		getline(cin, buff);
-		queueSafer.lock(); // Блокирование мьютекса для защиты очереди
+		queueSafer.lock(); // Р‘Р»РѕРєРёСЂРѕРІР°РЅРёРµ РјСЊСЋС‚РµРєСЃР° РґР»СЏ Р·Р°С‰РёС‚С‹ РѕС‡РµСЂРµРґРё
 		enteredAccounts.push(buff);
 		queueSafer.unlock();
 
-        thread th1(createTree);
-        th1.join();
-
-		// Условие завершения
+		// РЈСЃР»РѕРІРёРµ Р·Р°РІРµСЂС€РµРЅРёСЏ
         if (buff == "stop")
 		{
 			break;
 		}
 	}
 
-    cout << "Size of queue is " << enteredAccounts.size() << endl;
-
-	/*
-	thread th1(createTree);
-	thread th2(printTree);
-
-
 	th1.join();
-	th2.join();
-	*/
+
+    //cout << "Size of queue is " << enteredAccounts.size() << endl;
+
+	getchar();
 
     return 0;
 }

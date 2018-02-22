@@ -3,15 +3,12 @@
 
 #include <iostream>
 #include <thread>
-#include <queue>
 #include <mutex>
 #include <chrono>
 #include "employeethreads.h"
 
 using namespace std;
 
-mutex queueSafer;
-queue<string> enteredAccounts;
 
 // Печать очереди
 void printQueue(queue<string> input)
@@ -31,7 +28,6 @@ void printQueue(queue<string> input)
 // Добавление узла
 void addNode(string fio, string rank, string birthDate)
 {
-    Employee node; // Текущий узел для добавления
     // Блок ограничений на входные параметры
 	if (!treeSize && (rank != "director"))               // Сначала нужно задать директора предприятия
 	{
@@ -65,11 +61,11 @@ void addNode(string fio, string rank, string birthDate)
     }
     else
     {
+        Employee *newNode = new Employee;                                           // Новый узел
         if(rank == "manager")
         {
-            employeeTree->subordinate.push_back(NULL);                  // Создаём слот для менеджера
-            Employee *newNode = new Employee;                           // Выделили память для узла
-            employeeTree->subordinate.back() = newNode;                 // Новый узел и его заполнение
+            employeeTree->subordinate.push_back(NULL);                              // Создаём слот для менеджера
+            employeeTree->subordinate.back() = newNode;                             // Новый узел и его заполнение
             newNode->fio = fio;
             newNode->rank = rank;
             newNode->birthDate = birthDate;
@@ -77,9 +73,26 @@ void addNode(string fio, string rank, string birthDate)
         if(rank == "worker")
         {
             cout << "Worker, epta!" << endl;
+            for(size_t i = 0; i < employeeTree->subordinate.size(); ++i)            // Проходим циклом по всем имеющимся менеджерам
+            {
+               if (employeeTree->subordinate.at(i)->subordinate.size() < MAXSUB)    // Количество подчинённых у конкретного менеджера
+               {
+                   employeeTree->subordinate.at(i)->subordinate.push_back(NULL);    // Новый подчинённый у менеджера
+                   employeeTree->subordinate.at(i)->subordinate.back() = newNode;   // Заполнение данных нового работника
+                   newNode->fio = fio;
+                   newNode->rank = rank;
+                   newNode->birthDate = birthDate;
+                   break;                                                           // К другим менеджерам добавлять работника не надо
+               }
+               if(i == (employeeTree->subordinate.size() - 1))                     // У менеджеров нет свободного места
+               {
+                   cout << "Too few managers" << endl;
+                   return;
+               }
+            }
         }
     }
-    ++treeSize;                                                         // Дерево подросло
+    ++treeSize;                                                                     // Дерево подросло
     cout << "Tree size is " << treeSize << endl;
 }
 
@@ -113,7 +126,7 @@ void createTree()
 	{
 		if (!enteredAccounts.empty())
 		{
-			lock_guard<mutex> firstGuard(queueSafer); // Умное блокирование очереди
+            lock_guard<mutex> firstGuard(queueSaver); // Умное блокирование очереди
 
 			if (enteredAccounts.front() == "stop")
 			{
@@ -145,9 +158,9 @@ int main()
     while (true)
 	{
 		getline(cin, buff);
-		queueSafer.lock(); // Блокирование мьютекса для защиты очереди
+        queueSaver.lock(); // Блокирование мьютекса для защиты очереди
 		enteredAccounts.push(buff);
-		queueSafer.unlock();
+        queueSaver.unlock();
 
 		// Условие завершения
         if (buff == "stop")

@@ -3,8 +3,15 @@
 
 #include <string>
 #include <vector>
+#include <queue>
 
 using namespace std;
+
+/*************************Макросы**********************
+**
+ * @brief максимальное количество рядовых работников, которыми менеджер может управлять
+ */
+#define MAXSUB 2
 
 struct Employee
 {
@@ -21,8 +28,17 @@ struct Employee
 
 
 /*************************Переменные**********************/
-size_t treeSize;
+// Мьютекс для блокировки очереди
+mutex queueSaver;
+// Мьютекс для блокировки дерева
+mutex treeSaver;
+
+// Очередь, в которую добавляются введённые учетные записи
+queue<string> enteredAccounts;
 
 // Корень дерева работников
 Employee *employeeTree;
+
+// Размер дерева работников (количество узлов)
+size_t treeSize;
 #endif // EMPLOYEETHREADS_H

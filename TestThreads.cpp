@@ -31,6 +31,12 @@ Employee::Employee(string fio, string rank, string birthDate, bool printed = fal
     employeeBirthDate = birthDate;
 }
 
+// Деструктор
+Employee::~Employee()
+{
+    cout << "Destructor worked!" << endl;
+}
+
 // Вывод работника в файл
 bool Employee::printEmployee()
 {
@@ -49,6 +55,26 @@ bool Employee::printEmployee()
 
     fout.close();
     return 0;
+}
+
+// Освобождение памяти, занятой деревом
+void removeTree()
+{
+        if(employeeTree)
+        {
+            // Освобождение памяти, занятой менеджерами
+            for(size_t i = 0; i < employeeTree->subordinate.size(); ++i)
+            {
+                // Освобождение памяти, занятой подчинёнными конкретного менеджера
+                for(size_t j = 0; j < employeeTree->subordinate.at(i)->subordinate.size(); ++j)     // Проход по всем подчинённым конкретного менеджера
+                {
+                    delete employeeTree->subordinate.at(i)->subordinate.at(j);
+                }
+                delete employeeTree->subordinate.at(i);
+            }
+            // Освобождение памяти, занятой директором
+            delete employeeTree;
+        }
 }
 // Добавление узла
 void addNode(string fio, string rank, string birthDate)
@@ -102,7 +128,7 @@ void addNode(string fio, string rank, string birthDate)
                if(i == (employeeTree->subordinate.size() - 1))                      // У менеджеров нет свободного места
                {
                    cout << "Too few managers. Enter more managers, please." << endl;
-                   delete(newNode);                                                 // Освобождаем память работника, который в дерево включён не будет
+                   delete newNode;                                                 // Освобождаем память работника, который в дерево включён не будет
                    return;
                }
             }
@@ -171,6 +197,15 @@ void outputTree()
         {
            haveNewNode.wait(locker);
         }
+
+        // Условие остановки
+        if(stopFlag)
+        {
+            removeTree();
+            break;
+        }
+
+        // Обход дерева и вывод
         if(employeeTree)
         {
             if(!employeeTree->wasPrinted)
@@ -193,11 +228,6 @@ void outputTree()
             }
         }
 
-        // Условие остановки
-        if(stopFlag)
-        {
-            break;
-        }
         spuriosWakeup = false;
    }
     return;

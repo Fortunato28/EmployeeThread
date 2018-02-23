@@ -30,14 +30,14 @@ class Employee
 {
 public:
     Employee(string fio, string rank, string birthDate, bool printed);
+    bool wasPrinted;
+    vector<class Employee *> subordinate;
+    bool printEmployee();
+    ~Employee();
+private:
     string employeeFio;
     string employeeRank;
     string employeeBirthDate;
-    bool wasPrinted;
-
-    vector<class Employee *> subordinate;
-
-    bool printEmployee();
 };
 
 

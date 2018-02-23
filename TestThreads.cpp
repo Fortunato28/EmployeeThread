@@ -5,10 +5,8 @@
 #include <thread>
 #include <mutex>
 #include <chrono>
+#include <fstream>
 #include "employeethreads.h"
-
-using namespace std;
-
 
 // Печать очереди
 void printQueue(queue<string> input)
@@ -25,6 +23,33 @@ void printQueue(queue<string> input)
 
 }
 
+// Конструктор
+Employee::Employee(string fio, string rank, string birthDate, bool printed = false)
+{
+    employeeFio = fio;
+    employeeRank = rank;
+    employeeBirthDate = birthDate;
+}
+
+// Вывод работника в файл
+bool Employee::printEmployee()
+{
+    ofstream fout("employeeTree.txt", ios_base::out | ios_base::app);
+
+    if(!fout.is_open())                                     // Открыт ли файл
+    {
+        cout << "Have no output file!" << endl;
+        return 1;
+    }
+
+    fout << "Name: " << employeeFio << endl;
+    fout << "Rank: " << employeeRank << endl;
+    fout << "Date of birth: " << employeeBirthDate << endl << endl;
+    wasPrinted = true;
+
+    fout.close();
+    return 0;
+}
 // Добавление узла
 void addNode(string fio, string rank, string birthDate)
 {
@@ -51,47 +76,39 @@ void addNode(string fio, string rank, string birthDate)
         return;
 	}
 
-    // Блок добавления узла в зависимости от входных параметров
+    std::unique_lock<mutex> locker(treeSaver);      // Блокируем дерево сотрудников
+
+    // Блок добавления узла в зависимости от должности
     if(!employeeTree)               // По сути, это добавление корня дерева - директора
     {
-       employeeTree = new Employee;
-       employeeTree->fio = fio;
-       employeeTree->rank = rank;
-       employeeTree->birthDate = birthDate;
+       employeeTree = new Employee(fio, rank, birthDate);
     }
-    else
+    else                                                                            // Кроме менеджера и работника сюда ничего не придёт
     {
-        Employee *newNode = new Employee;                                           // Новый узел
+        Employee *newNode = new Employee(fio, rank, birthDate);                     // Новый узел
         if(rank == "manager")
         {
-            employeeTree->subordinate.push_back(NULL);                              // Создаём слот для менеджера
-            employeeTree->subordinate.back() = newNode;                             // Новый узел и его заполнение
-            newNode->fio = fio;
-            newNode->rank = rank;
-            newNode->birthDate = birthDate;
+            employeeTree->subordinate.push_back(newNode);                           // Создаём менеджера
         }
         if(rank == "worker")
         {
-            cout << "Worker, epta!" << endl;
             for(size_t i = 0; i < employeeTree->subordinate.size(); ++i)            // Проходим циклом по всем имеющимся менеджерам
             {
                if (employeeTree->subordinate.at(i)->subordinate.size() < MAXSUB)    // Количество подчинённых у конкретного менеджера
                {
-                   employeeTree->subordinate.at(i)->subordinate.push_back(NULL);    // Новый подчинённый у менеджера
-                   employeeTree->subordinate.at(i)->subordinate.back() = newNode;   // Заполнение данных нового работника
-                   newNode->fio = fio;
-                   newNode->rank = rank;
-                   newNode->birthDate = birthDate;
+                   employeeTree->subordinate.at(i)->subordinate.push_back(newNode); // Новый подчинённый у менеджера
                    break;                                                           // К другим менеджерам добавлять работника не надо
                }
-               if(i == (employeeTree->subordinate.size() - 1))                     // У менеджеров нет свободного места
+               if(i == (employeeTree->subordinate.size() - 1))                      // У менеджеров нет свободного места
                {
-                   cout << "Too few managers" << endl;
+                   cout << "Too few managers. Enter more managers, please." << endl;
+                   delete(newNode);                                                 // Освобождаем память работника, который в дерево включён не будет
                    return;
                }
             }
         }
     }
+
     ++treeSize;                                                                     // Дерево подросло
     cout << "Tree size is " << treeSize << endl;
 }
@@ -102,8 +119,8 @@ void fillTheTree(string workerData)
     size_t commaPosition;
     commaPosition = workerData.find(",");
     string fio = workerData.substr(0, commaPosition);
-    ++commaPosition;                                                            // Для сдвига
-    workerData = workerData.substr(commaPosition, workerData.length() - 1);     // Сдвиг строки
+    ++commaPosition;                                                                    // Для сдвига
+    workerData = workerData.substr(commaPosition, workerData.length() - 1);             // Сдвиг строки
     //cout << "FIO is " << fio << endl;
 
     commaPosition = workerData.find(",");
@@ -111,12 +128,13 @@ void fillTheTree(string workerData)
     //cout << "Rank is " << rank << endl;
 
     commaPosition++;
-    string birthDate = workerData.substr(commaPosition, workerData.length() - 1);     // Сдвиг строки
+    string birthDate = workerData.substr(commaPosition, workerData.length() - 1);       // Сдвиг строки
     //cout << "Date of Birth is " << birthDate << endl; 
 
     // Добавление узла работника
-
     addNode(fio, rank, birthDate);
+    spuriosWakeup = true;                           // Указываем, что действительно хотим пробудить второй поток
+    haveNewNode.notify_one();                       // Сигнал ожидающему потоку
 }
 
 // Первый поток
@@ -131,47 +149,89 @@ void createTree()
 			if (enteredAccounts.front() == "stop")
 			{
 				// TODO: написать включение последнего элемента "stop"
-				return;
+                spuriosWakeup = true;
+                stopFlag = true;
+                haveNewNode.notify_one();
+                return;
 			}
-			//printQueue(enteredAccounts);  // Использование общих данных
             fillTheTree(enteredAccounts.front());
-			enteredAccounts.pop();
-		}
-        this_thread::sleep_for(chrono::seconds(1));             // А это чтобы бесконечный цикл не слишком сильно грузил проц
+            enteredAccounts.pop();
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));             // А это чтобы бесконечный цикл не слишком сильно грузил проц
 	}
 }
 
 //Второй поток
-void printTree()
+void outputTree()
 {
-	cout << "Print employees tree" << endl;
+    while(true)
+    {
+        std::unique_lock<mutex> locker(treeSaver);      // Блокировка для условной переменной
+        while(!spuriosWakeup)                           // Защита от случайных пробуждений
+        {
+           haveNewNode.wait(locker);
+        }
+        if(employeeTree)
+        {
+            if(!employeeTree->wasPrinted)
+            {
+                employeeTree->printEmployee();
+            }
+
+            // Вывод менеджеров
+            for(size_t i = 0; i < employeeTree->subordinate.size(); ++i)
+            {
+                if(!employeeTree->subordinate.at(i)->wasPrinted)        // Если до этого не был напечатан
+                employeeTree->subordinate.at(i)->printEmployee();       // То выведем
+
+                // Вывод простых работников
+                for(size_t j = 0; j < employeeTree->subordinate.at(i)->subordinate.size(); ++j)     // Проход по всем подчинённым конкретного менеджера
+                {
+                    if(!employeeTree->subordinate.at(i)->subordinate.at(j)->wasPrinted)
+                    employeeTree->subordinate.at(i)->subordinate.at(j)->printEmployee();
+                }
+            }
+        }
+
+        // Условие остановки
+        if(stopFlag)
+        {
+            break;
+        }
+        spuriosWakeup = false;
+   }
+    return;
 }
 
 int main()
 {
 	string buff = "";
-	treeSize = 0;
-    employeeTree = NULL;
+    treeSize = 0;                                       // Дерево пусто
+    employeeTree = NULL;                                // Директора нет
+    stopFlag = false;                                   // Управление выводом
+    spuriosWakeup = false;                              // Защита от ложных пробуждений
+    ofstream fout("employeeTree.txt", ios_base::out | ios_base::trunc); // Открываем и очищаем файл
+    fout.close();
 
 	thread th1(createTree);
+    thread th2(outputTree);
 
     while (true)
 	{
 		getline(cin, buff);
-        queueSaver.lock(); // Блокирование мьютекса для защиты очереди
+        queueSaver.lock();                              // Блокирование мьютекса для защиты очереди
 		enteredAccounts.push(buff);
         queueSaver.unlock();
 
 		// Условие завершения
         if (buff == "stop")
-		{
+        {
 			break;
 		}
 	}
 
 	th1.join();
-
-    //cout << "Size of queue is " << enteredAccounts.size() << endl;
+    th2.join();
 
 	getchar();
 
